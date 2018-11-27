@@ -34,6 +34,11 @@ class BaseEntity(object):
         else:
             self.current_query += " WHERE {}".format(clause)
 
+    def update(self, **kwargs):
+        data = self.client.update(self.klass, key='key', key_value=self.id, **kwargs)
+
+        return self.deserialize(data)
+
     def find_by_name(self, name, active=True):
         if not hasattr(self, 'klass'):
             raise ValueError("find_by_name cannot be called on {} object".format(BaseEntity.OBJECT_CLASS))
@@ -56,12 +61,11 @@ class BaseEntity(object):
     def delete(self):
         raise NotImplementedError
 
-    def update(self):
-        raise NotImplementedError
-
     def fetch(self):
         data = self.client.get(self.klass, self.current_query)
         return self.deserialize(data)
+
+    
 
     def deserialize(self, data):
         return Utils.deserialize(self.klass, data, self.client)
@@ -92,6 +96,15 @@ class UserRequest(BaseEntity):
         self.klass = UserRequest.OBJECT_CLASS
         self.current_query = None
 
+    def find_by_id(self, id):
+        self.select_where("id = '{}'".format(id))
+        res = self.fetch()
+
+        if res.objects:
+            return res.objects[0]
+
+        return
+    
     def find_by_organization_id(self, id, active=True, last_update=None):
 
         self.select_where("org_id = '{}'".format(id))
@@ -122,7 +135,7 @@ class UserRequest(BaseEntity):
             self.where("last_update >= '{:%Y-%m-%d %H:%M:%S}'".format(last_update))
 
         return self.fetch()
-        
+
     @property
     def query_inactive(self):
         return "status IN ('rejected', 'resolved', 'closed') "
@@ -166,7 +179,7 @@ class Utils:
     def convert(name, dictionary):
         for key, value in dictionary.iteritems():
             if isinstance(value, dict):
-                dictionary[key] = Utils.convert(name, value)
+                dictionary[key] = Utils.convert(key, value)
 
         return namedtuple(name, dictionary.keys())(**dictionary)
 
