@@ -4,3 +4,6 @@ examples/
 dist/
 README.txt
 MANIFEST.in
+*.pyc
+test.py
+venv
