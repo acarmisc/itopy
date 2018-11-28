@@ -11,6 +11,7 @@ class BaseEntity(object):
         self.id = None
         self.client = client
         self.me = None
+        self.current_query = None
 
     def find(self, where):
         return self.client.get(OBJECT_CLASS, "SELECT {} WHERE {}".format(OBJECT_CLASS, where))
@@ -34,11 +35,6 @@ class BaseEntity(object):
         else:
             self.current_query += " WHERE {}".format(clause)
 
-    def update(self, **kwargs):
-        data = self.client.update(self.klass, key='key', key_value=self.id, **kwargs)
-
-        return self.deserialize(data)
-
     def find_by_name(self, name, active=True):
         if not hasattr(self, 'klass'):
             raise ValueError("find_by_name cannot be called on {} object".format(BaseEntity.OBJECT_CLASS))
@@ -52,11 +48,23 @@ class BaseEntity(object):
         return self.deserialize(data)
 
     def find_by_id(self, id, active=True):
-        self.select_where("id = '{}'".format(id))    
-        if not active:
-            self.where("status = 0")
-        
-        return self.fetch()
+        self.select_where("id = '{}'".format(id))
+        res = self.fetch()
+
+        if res.objects:
+            return res.objects[0]
+
+        return 
+
+    def update(self, **kwargs):
+        data = self.client.update(self.klass, key='key', key_value=self.id, **kwargs)
+
+        return self.deserialize(data)
+
+    def create(self, **kwargs):
+        data = self.client.create(self.klass, **kwargs)
+        print data
+        return self.deserialize(data)
 
     def delete(self):
         raise NotImplementedError
@@ -64,8 +72,6 @@ class BaseEntity(object):
     def fetch(self):
         data = self.client.get(self.klass, self.current_query)
         return self.deserialize(data)
-
-    
 
     def deserialize(self, data):
         return Utils.deserialize(self.klass, data, self.client)
@@ -94,7 +100,6 @@ class UserRequest(BaseEntity):
     def __init__(self, client):
         super(UserRequest, self).__init__(client)
         self.klass = UserRequest.OBJECT_CLASS
-        self.current_query = None
 
     def find_by_id(self, id):
         self.select_where("id = '{}'".format(id))
@@ -105,10 +110,12 @@ class UserRequest(BaseEntity):
 
         return
     
-    def find_by_organization_id(self, id, active=True, last_update=None):
+    def find_by_organization_id(self, id, active=True, last_update=None, include_inactive=False):
 
         self.select_where("org_id = '{}'".format(id))
-        self.where(self.query_active) if active else self.where(self.query_inactive)
+
+        if not include_inactive:
+	        self.where(self.query_active) if active else self.where(self.query_inactive)
         
         if last_update:
             self.where("last_update >= '{:%Y-%m-%d %H:%M:%S}'".format(last_update))
@@ -144,6 +151,16 @@ class UserRequest(BaseEntity):
     def query_active(self):
         return "status NOT IN ('rejected', 'resolved', 'closed') "
 
+
+class Person(BaseEntity):
+
+    OBJECT_CLASS = "Person"
+
+    def __init__(self, client):
+        super(Person, self).__init__(client)
+        self.klass = Person.OBJECT_CLASS
+	
+
 class Utils:
 
     @staticmethod
@@ -154,7 +171,6 @@ class Utils:
             - klass: string with the  object class name
             - message: message answered from iTop server
         """
-
         struct = dict(message=data.get('message', None), objects=None)
 
         payload = list()
@@ -182,4 +198,6 @@ class Utils:
                 dictionary[key] = Utils.convert(key, value)
 
         return namedtuple(name, dictionary.keys())(**dictionary)
+
+
 
