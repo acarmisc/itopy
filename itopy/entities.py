@@ -63,7 +63,6 @@ class BaseEntity(object):
 
     def create(self, **kwargs):
         data = self.client.create(self.klass, **kwargs)
-        print data
         return self.deserialize(data)
 
     def delete(self):
@@ -109,7 +108,13 @@ class UserRequest(BaseEntity):
             return res.objects[0]
 
         return
-    
+
+    def find_by_caller_name(self, name):
+
+        self.select_where("caller_name = '{}'".format(name))
+
+        return self.fetch()
+
     def find_by_organization_id(self, id, active=True, last_update=None, include_inactive=False):
 
         self.select_where("org_id = '{}'".format(id))
