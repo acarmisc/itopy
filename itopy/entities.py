@@ -109,9 +109,15 @@ class UserRequest(BaseEntity):
 
         return
 
-    def find_by_caller_name(self, name):
+    def find_by_caller_name(self, name, last_update=None, include_inactive=False):
 
         self.select_where("caller_name = '{}'".format(name))
+
+        if not include_inactive:
+            self.where(self.query_active) if active else self.where(self.query_inactive)
+
+        if last_update:
+            self.where("last_update >= '{:%Y-%m-%d %H:%M:%S}'".format(last_update))
 
         return self.fetch()
 
@@ -203,6 +209,4 @@ class Utils:
                 dictionary[key] = Utils.convert(key, value)
 
         return namedtuple(name, dictionary.keys())(**dictionary)
-
-
 
